@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { MeetingData, TranscriptData, SummaryData } from '../types';
+import type { MeetingData, TranscriptData, SummaryData } from '../types';
 
 interface MeetingState {
   // Core data using defined types

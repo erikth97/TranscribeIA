@@ -1,4 +1,4 @@
-import { MeetingData, SummaryData } from '../types';
+import type { MeetingData, SummaryData } from '../types';
 
 export const exportToPDF = async (
   summary: SummaryData,
@@ -24,12 +24,11 @@ export const exportToPDF = async (
 
 const generatePDFContent = (summary: SummaryData, meetingData: MeetingData) => {
   return {
-    title: `Minuta: ${meetingData.meetingName}`,
+    title: `Minuta: ${meetingData.name}`,
     date: new Date().toLocaleDateString('es-MX'),
     participants: meetingData.participants.join(', '),
     type: meetingData.type,
-    content: summary.content,
-    metadata: summary.metadata
+    content: summary.content
   };
 };
 

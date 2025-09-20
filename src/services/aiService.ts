@@ -1,4 +1,4 @@
-import { MeetingData, TranscriptData, ApiResponse } from '../types';
+import type { MeetingData, TranscriptData } from '../types';
 
 interface SummaryRequest {
   transcript: string;
