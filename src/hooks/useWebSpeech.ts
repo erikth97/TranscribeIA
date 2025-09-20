@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { SpeechRecognitionResult, RecordingStatus } from '../types';
+import type { RecordingStatus } from '../types';
 
 export const useWebSpeech = () => {
   const [status, setStatus] = useState<RecordingStatus>('idle');

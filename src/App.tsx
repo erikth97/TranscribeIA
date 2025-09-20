@@ -1,4 +1,33 @@
+import MeetingForm from './components/MeetingForm';
+import RecordButton from './components/RecordButton';
+import { useWebSpeech } from './hooks/useWebSpeech';
+
 function App() {
+  const {
+    status,
+    wordCount,
+    duration,
+    startRecording,
+    stopRecording,
+    resetRecording
+  } = useWebSpeech();
+
+  const handleToggleRecording = () => {
+    switch (status) {
+      case 'idle':
+        startRecording();
+        break;
+      case 'recording':
+        stopRecording();
+        break;
+      case 'completed':
+        resetRecording();
+        break;
+      default:
+        break;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       {/* Header */}
@@ -24,9 +53,7 @@ function App() {
               <h2 className="text-xl font-semibold mb-4 text-purple-300">
                 📋 Datos de la Reunión
               </h2>
-              <div className="bg-gray-700 rounded p-4 text-center text-gray-400">
-                Formulario de metadatos aquí
-              </div>
+              <MeetingForm />
             </div>
 
             {/* Controls Section */}
@@ -34,9 +61,12 @@ function App() {
               <h2 className="text-xl font-semibold mb-4 text-purple-300">
                 🎛️ Controles de Grabación
               </h2>
-              <div className="bg-gray-700 rounded p-4 text-center text-gray-400">
-                Botón de grabación aquí
-              </div>
+              <RecordButton
+                status={status}
+                onToggle={handleToggleRecording}
+                duration={duration}
+                wordCount={wordCount}
+              />
             </div>
           </div>
 

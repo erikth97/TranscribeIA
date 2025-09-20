@@ -79,4 +79,4 @@ export interface MeetingFormData {
 }
 
 // Recording states
-export type RecordingStatus = 'idle' | 'recording' | 'paused' | 'completed' | 'error';
+export type RecordingStatus = 'idle' | 'recording' | 'paused' | 'processing' | 'completed' | 'error';
