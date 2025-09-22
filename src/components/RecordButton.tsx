@@ -1,4 +1,4 @@
-import React from 'react';
+import type { FC } from 'react';
 import type { RecordingStatus } from '../types';
 
 interface RecordButtonProps {
@@ -8,7 +8,7 @@ interface RecordButtonProps {
   wordCount?: number;
 }
 
-const RecordButton: React.FC<RecordButtonProps> = ({
+const RecordButton: FC<RecordButtonProps> = ({
   status,
   onToggle,
   duration = 0,
@@ -25,35 +25,35 @@ const RecordButton: React.FC<RecordButtonProps> = ({
       case 'idle':
         return {
           emoji: '🎙️',
-          className: 'bg-purple-600 hover:bg-purple-700 border-purple-500 hover:scale-110',
+          className: 'idle',
           disabled: false
         };
       
       case 'recording':
         return {
           emoji: '🔴',
-          className: 'bg-red-600 hover:bg-red-700 border-red-500 animate-pulse hover:scale-110',
+          className: 'recording',
           disabled: false
         };
       
       case 'processing':
         return {
           emoji: '⏳',
-          className: 'bg-orange-600 border-orange-500 cursor-not-allowed',
+          className: 'processing',
           disabled: true
         };
       
       case 'completed':
         return {
           emoji: '✅',
-          className: 'bg-green-600 hover:bg-green-700 border-green-500 hover:scale-110',
+          className: 'completed',
           disabled: false
         };
       
       default:
         return {
           emoji: '❌',
-          className: 'bg-red-600 border-red-500 cursor-not-allowed',
+          className: 'error',
           disabled: true
         };
     }
@@ -67,16 +67,9 @@ const RecordButton: React.FC<RecordButtonProps> = ({
       <button
         onClick={buttonConfig.disabled ? undefined : onToggle}
         disabled={buttonConfig.disabled}
-        className={`
-          w-20 h-20 rounded-full border-4 font-semibold text-white 
-          transition-all duration-200 transform
-          focus:outline-none focus:ring-4 focus:ring-purple-300 focus:ring-opacity-50
-          disabled:transform-none disabled:hover:scale-100
-          flex items-center justify-center
-          ${buttonConfig.className}
-        `}
+        className={`record-button ${buttonConfig.className}`}
       >
-        <span className="text-2xl">{buttonConfig.emoji}</span>
+        <span>{buttonConfig.emoji}</span>
       </button>
 
       {/* Status Indicator */}
