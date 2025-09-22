@@ -1,15 +1,37 @@
-import React, { useState } from 'react';
+import { useEffect } from 'react';
+import { useForm, useFieldArray } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import type { FC } from 'react';
 import type { MeetingData } from '../types';
+import { MeetingFormSchema, defaultMeetingForm } from '../types/schemas';
+import type { MeetingFormInput } from '../types/schemas';
 import { useMeetingStore } from '../store/meetingStore';
+import { useLocalStorage } from '../hooks/useLocalStorage';
 
-const MeetingForm: React.FC = () => {
+const MeetingForm: FC = () => {
   const { setMeetingData } = useMeetingStore();
-  const [formData, setFormData] = useState({
-    name: '',
-    type: 'daily' as const
+  const [savedFormData, setSavedFormData] = useLocalStorage('meeting-form-draft', defaultMeetingForm);
+
+  // React Hook Form setup with Zod validation
+  const {
+    register,
+    control,
+    handleSubmit,
+    watch,
+    formState: { errors, isValid, dirtyFields }
+  } = useForm<MeetingFormInput>({
+    resolver: zodResolver(MeetingFormSchema),
+    defaultValues: savedFormData,
+    mode: 'onChange'
   });
-  const [participants, setParticipants] = useState<string[]>(['']);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'participants' as never
+  });
+
+  // Watch form changes for auto-save
+  const watchedData = watch();
 
   // Get current date and time
   const currentDate = new Date();
@@ -25,83 +47,65 @@ const MeetingForm: React.FC = () => {
     hour12: false
   });
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-    
-    if (!formData.name.trim()) {
-      newErrors.name = 'El nombre de la reunión es requerido';
-    } else if (formData.name.length < 3) {
-      newErrors.name = 'El nombre debe tener al menos 3 caracteres';
+  // Auto-save form data to localStorage on changes
+  useEffect(() => {
+    if (Object.keys(dirtyFields).length > 0) {
+      setSavedFormData(watchedData);
     }
-    
-    const validParticipants = participants.filter(p => p.trim().length > 0);
-    if (validParticipants.length === 0) {
-      newErrors.participants = 'Debe haber al menos un participante';
+  }, [watchedData, dirtyFields, setSavedFormData]);
+
+  // Auto-save to store when form is valid
+  useEffect(() => {
+    if (isValid && watchedData.participants.length > 0) {
+      const validParticipants = watchedData.participants.filter(p => p.trim().length > 0);
+      
+      if (validParticipants.length > 0) {
+        const meetingData: MeetingData = {
+          name: watchedData.name,
+          participants: validParticipants,
+          type: watchedData.type
+        };
+        setMeetingData(meetingData);
+      }
     }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  }, [isValid, watchedData, setMeetingData]);
 
-  const handleInputChange = (field: string, value: string) => {
-    const newFormData = { ...formData, [field]: value };
-    setFormData(newFormData);
-    autoSaveData(newFormData, participants);
-  };
-
-  const handleParticipantChange = (index: number, value: string) => {
-    const newParticipants = [...participants];
-    newParticipants[index] = value;
-    setParticipants(newParticipants);
-    autoSaveData(formData, newParticipants);
-  };
-
+  // Add participant field
   const addParticipant = () => {
-    setParticipants([...participants, '']);
+    append('');
   };
 
+  // Remove participant field
   const removeParticipant = (index: number) => {
-    if (participants.length > 1) {
-      const newParticipants = participants.filter((_, i) => i !== index);
-      setParticipants(newParticipants);
-      autoSaveData(formData, newParticipants);
+    if (fields.length > 1) {
+      remove(index);
     }
   };
 
-  const autoSaveData = (currentFormData: typeof formData, currentParticipants: string[]) => {
-    const validParticipants = currentParticipants.filter(p => p.trim().length > 0);
+  // Form submission handler
+  const onSubmit = (data: MeetingFormInput) => {
+    const validParticipants = data.participants.filter(p => p.trim().length > 0);
     
-    if (currentFormData.name.length >= 3 && validParticipants.length > 0 && currentFormData.type) {
-      const meetingData: MeetingData = {
-        name: currentFormData.name,
-        participants: validParticipants,
-        type: currentFormData.type
-      };
-      
-      setMeetingData(meetingData);
-    }
+    const meetingData: MeetingData = {
+      name: data.name,
+      participants: validParticipants,
+      type: data.type
+    };
+    
+    setMeetingData(meetingData);
+    // Clear saved draft after successful submission
+    setSavedFormData(defaultMeetingForm);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (validateForm()) {
-      const validParticipants = participants.filter(p => p.trim().length > 0);
-      
-      const meetingData: MeetingData = {
-        name: formData.name,
-        participants: validParticipants,
-        type: formData.type
-      };
-      
-      setMeetingData(meetingData);
+  // Ensure we have at least one participant field
+  useEffect(() => {
+    if (fields.length === 0) {
+      append('');
     }
-  };
-
-  const validParticipants = participants.filter(p => p.trim().length > 0);
-  const isFormComplete = formData.name.length >= 3 && validParticipants.length > 0 && formData.type;
+  }, [fields.length, append]);
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       {/* Date and Time Display */}
       <div className="bg-gray-800 rounded-lg p-3 border border-gray-600">
         <div className="flex items-center justify-between text-sm">
@@ -126,17 +130,16 @@ const MeetingForm: React.FC = () => {
           Nombre de la Reunión
         </label>
         <input
+          {...register('name')}
           id="name"
           type="text"
-          value={formData.name}
-          onChange={(e) => handleInputChange('name', e.target.value)}
           className={`w-full px-3 py-2 bg-gray-700 border rounded-lg text-white placeholder-gray-400 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
             errors.name ? 'border-red-500' : 'border-gray-600'
           }`}
           placeholder="Ej: Daily Standup - Equipo Frontend"
         />
         {errors.name && (
-          <p className="text-sm text-red-400">{errors.name}</p>
+          <p className="text-sm text-red-400">{errors.name.message}</p>
         )}
       </div>
 
@@ -159,16 +162,17 @@ const MeetingForm: React.FC = () => {
         </div>
         
         <div className="space-y-2">
-          {participants.map((participant, index) => (
-            <div key={index} className="flex items-center gap-2">
+          {fields.map((field, index) => (
+            <div key={field.id} className="flex items-center gap-2">
               <input
+                {...register(`participants.${index}`)}
                 type="text"
-                value={participant}
-                onChange={(e) => handleParticipantChange(index, e.target.value)}
-                className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className={`flex-1 px-3 py-2 bg-gray-700 border rounded-lg text-white placeholder-gray-400 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                  errors.participants?.[index] ? 'border-red-500' : 'border-gray-600'
+                }`}
                 placeholder={`Participante ${index + 1}`}
               />
-              {participants.length > 1 && (
+              {fields.length > 1 && (
                 <button
                   type="button"
                   onClick={() => removeParticipant(index)}
@@ -185,7 +189,9 @@ const MeetingForm: React.FC = () => {
         </div>
         
         {errors.participants && (
-          <p className="text-sm text-red-400">{errors.participants}</p>
+          <p className="text-sm text-red-400">
+            {errors.participants.message || errors.participants.root?.message}
+          </p>
         )}
       </div>
 
@@ -195,20 +201,24 @@ const MeetingForm: React.FC = () => {
           Tipo de Reunión
         </label>
         <select
+          {...register('type')}
           id="type"
-          value={formData.type}
-          onChange={(e) => handleInputChange('type', e.target.value)}
-          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          className={`w-full px-3 py-2 bg-gray-700 border rounded-lg text-white transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+            errors.type ? 'border-red-500' : 'border-gray-600'
+          }`}
         >
           <option value="daily">Daily Standup</option>
           <option value="planning">Planning / Sprint</option>
           <option value="retrospective">Retrospectiva</option>
         </select>
+        {errors.type && (
+          <p className="text-sm text-red-400">{errors.type.message}</p>
+        )}
       </div>
 
       {/* Form Status Indicator */}
       <div className="pt-2">
-        {isFormComplete ? (
+        {isValid && watchedData.participants.some(p => p.trim().length > 0) ? (
           <div className="flex items-center text-sm text-green-400">
             <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -224,6 +234,18 @@ const MeetingForm: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Debug info in development */}
+      {import.meta.env.DEV && (
+        <div className="mt-4 p-2 bg-gray-800 rounded text-xs text-gray-400">
+          <details>
+            <summary>Debug Info (solo desarrollo)</summary>
+            <pre className="mt-2 text-xs">
+              {JSON.stringify({ isValid, errors, watchedData }, null, 2)}
+            </pre>
+          </details>
+        </div>
+      )}
     </form>
   );
 };
