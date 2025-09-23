@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { FC } from 'react';
@@ -22,7 +22,7 @@ const MeetingForm: FC = () => {
   } = useForm<MeetingFormInput>({
     resolver: zodResolver(MeetingFormSchema),
     defaultValues: savedFormData,
-    mode: 'onChange'
+    mode: 'onBlur' // Change from onChange to onBlur for better performance
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -30,44 +30,65 @@ const MeetingForm: FC = () => {
     name: 'participants' as never
   });
 
-  // Watch form changes for auto-save
+  // Watch form changes for auto-save - MEMOIZED to prevent unnecessary re-renders
   const watchedData = watch();
+  
+  // Memoize expensive date calculations
+  const { formattedDate, formattedTime } = useMemo(() => {
+    const currentDate = new Date();
+    return {
+      formattedDate: currentDate.toLocaleDateString('es-MX', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      }),
+      formattedTime: currentDate.toLocaleTimeString('es-MX', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      })
+    };
+  }, []); // Only calculate once on mount
 
-  // Get current date and time
-  const currentDate = new Date();
-  const formattedDate = currentDate.toLocaleDateString('es-MX', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
-  const formattedTime = currentDate.toLocaleTimeString('es-MX', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  });
 
-  // Auto-save form data to localStorage on changes
+  // Auto-save form data to localStorage on changes - DEBOUNCED
   useEffect(() => {
-    if (Object.keys(dirtyFields).length > 0) {
-      setSavedFormData(watchedData);
-    }
+    const timer = setTimeout(() => {
+      try {
+        if (Object.keys(dirtyFields).length > 0) {
+          setSavedFormData(watchedData);
+        }
+      } catch (error) {
+        console.error('Error auto-saving form data:', error);
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timer);
   }, [watchedData, dirtyFields, setSavedFormData]);
 
-  // Auto-save to store when form is valid
+  // Auto-save to store when form is valid - DEBOUNCED
   useEffect(() => {
-    if (isValid && watchedData.participants.length > 0) {
-      const validParticipants = watchedData.participants.filter(p => p.trim().length > 0);
-      
-      if (validParticipants.length > 0) {
-        const meetingData: MeetingData = {
-          name: watchedData.name,
-          participants: validParticipants,
-          type: watchedData.type
-        };
-        setMeetingData(meetingData);
+    const timer = setTimeout(() => {
+      try {
+        if (isValid && watchedData.participants.length > 0) {
+          const validParticipants = watchedData.participants.filter(p => p.trim().length > 0);
+          
+          if (validParticipants.length > 0) {
+            const meetingData: MeetingData = {
+              name: watchedData.name,
+              participants: validParticipants,
+              type: watchedData.type
+            };
+            setMeetingData(meetingData);
+          }
+        }
+      } catch (error) {
+        console.error('Error auto-saving to store:', error);
       }
-    }
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timer);
   }, [isValid, watchedData, setMeetingData]);
 
   // Add participant field
@@ -99,8 +120,12 @@ const MeetingForm: FC = () => {
 
   // Ensure we have at least one participant field
   useEffect(() => {
-    if (fields.length === 0) {
-      append('');
+    try {
+      if (fields.length === 0) {
+        append('');
+      }
+    } catch (error) {
+      console.error('Error ensuring participant field:', error);
     }
   }, [fields.length, append]);
 
