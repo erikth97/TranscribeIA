@@ -50,6 +50,13 @@ const RecordButton: FC<RecordButtonProps> = ({
           disabled: false
         };
       
+      case 'error':
+        return {
+          emoji: '🔄', // Recovery icon instead of X
+          className: 'error',
+          disabled: false // Allow clicking to recover
+        };
+      
       default:
         return {
           emoji: '❌',
@@ -105,6 +112,17 @@ const RecordButton: FC<RecordButtonProps> = ({
             </div>
             <div className="text-sm text-gray-300">
               {formatDuration(duration)} • {wordCount.toLocaleString()} palabras
+            </div>
+          </div>
+        )}
+        
+        {status === 'error' && (
+          <div className="space-y-1">
+            <div className="flex items-center justify-center space-x-2 text-red-400">
+              <span className="text-sm font-medium">ERROR</span>
+            </div>
+            <div className="text-xs text-gray-400">
+              Toca para reintentar
             </div>
           </div>
         )}

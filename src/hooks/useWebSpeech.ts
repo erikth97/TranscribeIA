@@ -8,6 +8,7 @@ export const useWebSpeech = () => {
   const [wordCount, setWordCount] = useState(0);
   const [duration, setDuration] = useState(0);
   const [error, setError] = useState<string | undefined>();
+  const [showErrorPopup, setShowErrorPopup] = useState<boolean>(false);
 
   const recognitionRef = useRef<any>(null);
   const intervalRef = useRef<number | null>(null);
@@ -29,7 +30,7 @@ export const useWebSpeech = () => {
 
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = 'es-ES';
+    recognition.lang = 'es-MX'; // Cambio de es-ES a es-MX según requerimiento
 
     recognition.onstart = () => {
       setStatus('recording');
@@ -62,7 +63,28 @@ export const useWebSpeech = () => {
 
     recognition.onerror = (event: any) => {
       console.error('Speech recognition error:', event.error);
+      
+      // Show popup for all errors but handle some gracefully
       setError(`Error de reconocimiento: ${event.error}`);
+      setShowErrorPopup(true);
+      
+      // Try to restart automatically for no-speech timeout
+      if (event.error === 'no-speech' && status === 'recording') {
+        console.warn('No speech detected, attempting restart...');
+        setTimeout(() => {
+          try {
+            recognition.start();
+            setError(undefined);
+            setShowErrorPopup(false);
+          } catch (e) {
+            console.error('Failed to restart recognition:', e);
+            setStatus('error');
+          }
+        }, 100);
+        return;
+      }
+      
+      // For other errors, set error state
       setStatus('error');
       
       if (intervalRef.current) {
@@ -92,7 +114,7 @@ export const useWebSpeech = () => {
         recognitionRef.current.stop();
       }
     };
-  }, [isSupported, status]);
+  }, [isSupported]); // Remove status dependency to prevent infinite loop
 
   const startRecording = useCallback(async () => {
     if (!isSupported) {
@@ -138,7 +160,11 @@ export const useWebSpeech = () => {
 
   const resetRecording = useCallback(() => {
     if (recognitionRef.current) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.stop();
+      } catch (error) {
+        console.error('Error stopping recognition:', error);
+      }
     }
     
     if (intervalRef.current) {
@@ -153,6 +179,32 @@ export const useWebSpeech = () => {
     setError(undefined);
   }, []);
 
+  // Add error recovery function
+  const recoverFromError = useCallback(() => {
+    console.log('Attempting to recover from error state...');
+    setStatus('idle');
+    setError(undefined);
+    setShowErrorPopup(false);
+    
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (error) {
+        console.error('Error stopping recognition during recovery:', error);
+      }
+    }
+  }, []);
+
+  // Close error popup function
+  const closeErrorPopup = useCallback(() => {
+    setShowErrorPopup(false);
+  }, []);
+
   const updateTranscript = useCallback((newText: string) => {
     setTranscript(newText);
     setWordCount(newText.trim().split(/\s+/).filter(word => word.length > 0).length);
@@ -164,11 +216,14 @@ export const useWebSpeech = () => {
     wordCount,
     duration,
     error,
+    showErrorPopup,
     isRecording: status === 'recording',
     isSupported,
     startRecording,
     stopRecording,
     resetRecording,
-    updateTranscript
+    updateTranscript,
+    recoverFromError,
+    closeErrorPopup
   };
 };
