@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { FC } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { useMeetingStore } from '../store/meetingStore';
 import { generateSummary } from '../services/aiService';
 import { exportToPDF } from '../utils/exportPDF';
@@ -36,7 +37,7 @@ const SummaryPanel: FC<SummaryPanelProps> = ({ className = '' }) => {
     setSummaryData({ isLoading: true, error: undefined });
 
     try {
-      const result = await generateSummary(transcriptData, meetingData);
+      const result = await generateSummary(transcriptData.text, meetingData);
       
       if (result.success) {
         setSummaryData({
@@ -223,8 +224,61 @@ const SummaryPanel: FC<SummaryPanelProps> = ({ className = '' }) => {
           </div>
         ) : summaryData.content ? (
           <div className="p-4">
-            <div className="text-white text-sm leading-relaxed whitespace-pre-wrap">
-              {summaryData.content}
+            <div className="text-white text-sm leading-relaxed prose prose-invert prose-sm max-w-none">
+              <ReactMarkdown
+                components={{
+                  // Customize markdown components for better styling
+                  h1: ({ children }) => (
+                    <h1 className="text-lg font-bold text-purple-300 mb-3 border-b border-purple-500/30 pb-2">
+                      {children}
+                    </h1>
+                  ),
+                  h2: ({ children }) => (
+                    <h2 className="text-base font-semibold text-purple-300 mb-2 mt-4">
+                      {children}
+                    </h2>
+                  ),
+                  h3: ({ children }) => (
+                    <h3 className="text-sm font-medium text-purple-300 mb-2 mt-3">
+                      {children}
+                    </h3>
+                  ),
+                  ul: ({ children }) => (
+                    <ul className="list-disc list-inside space-y-1 ml-2 text-gray-200">
+                      {children}
+                    </ul>
+                  ),
+                  ol: ({ children }) => (
+                    <ol className="list-decimal list-inside space-y-1 ml-2 text-gray-200">
+                      {children}
+                    </ol>
+                  ),
+                  li: ({ children }) => (
+                    <li className="text-sm text-gray-200">{children}</li>
+                  ),
+                  p: ({ children }) => (
+                    <p className="text-sm text-gray-200 mb-2 leading-relaxed">{children}</p>
+                  ),
+                  strong: ({ children }) => (
+                    <strong className="font-semibold text-white">{children}</strong>
+                  ),
+                  em: ({ children }) => (
+                    <em className="italic text-gray-300">{children}</em>
+                  ),
+                  code: ({ children }) => (
+                    <code className="bg-gray-800 text-purple-300 px-1 py-0.5 rounded text-xs">
+                      {children}
+                    </code>
+                  ),
+                  blockquote: ({ children }) => (
+                    <blockquote className="border-l-4 border-purple-500 pl-4 italic text-gray-300 bg-gray-800/50 py-2 rounded-r">
+                      {children}
+                    </blockquote>
+                  )
+                }}
+              >
+                {summaryData.content}
+              </ReactMarkdown>
             </div>
           </div>
         ) : (
