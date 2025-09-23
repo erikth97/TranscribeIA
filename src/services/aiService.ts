@@ -49,13 +49,14 @@ const retryWithBackoff = async <T>(
 };
 
 // Generate summary with mock fallback for development
+// ✅ TAREA 11: Función exacta según requerimientos
 export const generateSummary = async (
-  transcriptData: TranscriptData,
-  meetingData: MeetingData
+  transcript: string,
+  metadata: MeetingData
 ): Promise<SummaryResponse> => {
   
   // If no transcript, return early
-  if (!transcriptData.text || transcriptData.text.trim().length === 0) {
+  if (!transcript || transcript.trim().length === 0) {
     return {
       success: false,
       summary: '',
@@ -65,13 +66,13 @@ export const generateSummary = async (
 
   try {
     const requestData: SummaryRequest = {
-      transcript: transcriptData.text,
+      transcript: transcript,
       metadata: {
-        meetingName: meetingData.name,
-        participants: meetingData.participants,
-        type: meetingData.type,
-        duration: transcriptData.duration,
-        wordCount: transcriptData.wordCount
+        meetingName: metadata.name,
+        participants: metadata.participants,
+        type: metadata.type,
+        duration: transcript.split(/\s+/).length * 0.5, // Estimate duration based on words
+        wordCount: transcript.split(/\s+/).filter(word => word.length > 0).length
       }
     };
 
@@ -131,41 +132,44 @@ export const generateSummary = async (
     console.error('Error generating summary:', error);
     
     // Fallback: Generate mock summary for development/demo
-    return generateMockSummary(transcriptData, meetingData);
+    return generateMockSummary(transcript, metadata);
   }
 };
 
 // Mock summary generator for development/fallback
 const generateMockSummary = (
-  transcriptData: TranscriptData,
-  meetingData: MeetingData
+  transcript: string,
+  metadata: MeetingData
 ): SummaryResponse => {
+  const wordCount = transcript.split(/\s+/).filter(word => word.length > 0).length;
+  const estimatedDuration = wordCount * 0.5; // Estimate duration based on words
+  
   const summaryTemplates = {
     daily: generateDailySummary,
     planning: generatePlanningSummary,
     retrospective: generateRetrospectiveSummary
   };
 
-  const generator = summaryTemplates[meetingData.type] || summaryTemplates.daily;
-  const summary = generator(transcriptData, meetingData);
+  const generator = summaryTemplates[metadata.type] || summaryTemplates.daily;
+  const summary = generator(transcript, metadata, wordCount, estimatedDuration);
 
   return {
     success: true,
     summary,
     metadata: {
-      tokensUsed: Math.floor(transcriptData.wordCount * 1.3),
+      tokensUsed: Math.floor(wordCount * 1.3),
       processingTime: Math.random() * 2000 + 1000,
       model: 'mock-ai-model'
     }
   };
 };
 
-const generateDailySummary = (transcriptData: TranscriptData, meetingData: MeetingData): string => {
-  return `## Resumen Daily Standup - ${meetingData.name}
+const generateDailySummary = (transcript: string, metadata: MeetingData, wordCount: number, duration: number): string => {
+  return `## Resumen Daily Standup - ${metadata.name}
 
-**Participantes:** ${meetingData.participants.join(', ')}
-**Duración:** ${Math.floor(transcriptData.duration / 60)} minutos
-**Palabras transcritas:** ${transcriptData.wordCount.toLocaleString()}
+**Participantes:** ${metadata.participants.join(', ')}
+**Duración:** ${Math.floor(duration / 60)} minutos
+**Palabras transcritas:** ${wordCount.toLocaleString()}
 
 ### Puntos Principales Discutidos:
 • Estado actual de las tareas en progreso
@@ -178,15 +182,15 @@ const generateDailySummary = (transcriptData: TranscriptData, meetingData: Meeti
 • Resolver bloqueadores identificados
 • Seguimiento en el próximo daily
 
-*Este resumen fue generado automáticamente basado en la transcripción de ${transcriptData.wordCount} palabras.*`;
+*Este resumen fue generado automáticamente basado en la transcripción de ${wordCount} palabras.*`;
 };
 
-const generatePlanningSummary = (transcriptData: TranscriptData, meetingData: MeetingData): string => {
-  return `## Resumen Planning Session - ${meetingData.name}
+const generatePlanningSummary = (transcript: string, metadata: MeetingData, wordCount: number, duration: number): string => {
+  return `## Resumen Planning Session - ${metadata.name}
 
-**Participantes:** ${meetingData.participants.join(', ')}
-**Duración:** ${Math.floor(transcriptData.duration / 60)} minutos
-**Palabras transcritas:** ${transcriptData.wordCount.toLocaleString()}
+**Participantes:** ${metadata.participants.join(', ')}
+**Duración:** ${Math.floor(duration / 60)} minutos
+**Palabras transcritas:** ${wordCount.toLocaleString()}
 
 ### Objetivos del Sprint:
 • Definición de historias de usuario prioritarias
@@ -204,15 +208,15 @@ const generatePlanningSummary = (transcriptData: TranscriptData, meetingData: Me
 • Daily standups para seguimiento de progreso
 • Review al final del sprint
 
-*Este resumen fue generado automáticamente basado en la transcripción de ${transcriptData.wordCount} palabras.*`;
+*Este resumen fue generado automáticamente basado en la transcripción de ${wordCount} palabras.*`;
 };
 
-const generateRetrospectiveSummary = (transcriptData: TranscriptData, meetingData: MeetingData): string => {
-  return `## Resumen Retrospectiva - ${meetingData.name}
+const generateRetrospectiveSummary = (transcript: string, metadata: MeetingData, wordCount: number, duration: number): string => {
+  return `## Resumen Retrospectiva - ${metadata.name}
 
-**Participantes:** ${meetingData.participants.join(', ')}
-**Duración:** ${Math.floor(transcriptData.duration / 60)} minutos
-**Palabras transcritas:** ${transcriptData.wordCount.toLocaleString()}
+**Participantes:** ${metadata.participants.join(', ')}
+**Duración:** ${Math.floor(duration / 60)} minutos
+**Palabras transcritas:** ${wordCount.toLocaleString()}
 
 ### ¿Qué funcionó bien?
 • Comunicación efectiva entre el equipo
@@ -229,5 +233,5 @@ const generateRetrospectiveSummary = (transcriptData: TranscriptData, meetingDat
 • Asignar responsables para cada acción
 • Revisar progreso en próxima retrospectiva
 
-*Este resumen fue generado automáticamente basado en la transcripción de ${transcriptData.wordCount} palabras.*`;
+*Este resumen fue generado automáticamente basado en la transcripción de ${wordCount} palabras.*`;
 };
