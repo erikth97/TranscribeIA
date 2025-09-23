@@ -17,12 +17,28 @@ const TranscriptPanel: FC<TranscriptPanelProps> = ({ className = '' }) => {
   const [, setTranscriptHistory] = useLocalStorage<any[]>('transcript-history', []);
   const [lastTranscript, setLastTranscript] = useLocalStorage<string>('last-transcript', '');
 
-  // Auto-scroll to bottom when new content is added
+  // Auto-scroll to bottom when new content is added (TAREA 7.1)
   useEffect(() => {
-    if (transcriptEndRef.current) {
-      transcriptEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (transcriptEndRef.current && transcript) {
+      // Smooth scroll to bottom for better UX
+      transcriptEndRef.current.scrollIntoView({ 
+        behavior: 'smooth',
+        block: 'end',
+        inline: 'nearest'
+      });
     }
   }, [transcript]);
+
+  // Additional auto-scroll for real-time updates during recording
+  useEffect(() => {
+    if (status === 'recording' && transcriptEndRef.current) {
+      // More aggressive scroll during active recording
+      const scrollContainer = transcriptEndRef.current.closest('.overflow-y-auto');
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
+    }
+  }, [transcript, status]);
 
   // Update store when transcript changes
   useEffect(() => {
@@ -86,6 +102,29 @@ const TranscriptPanel: FC<TranscriptPanelProps> = ({ className = '' }) => {
     }
   };
 
+  // Placeholder functions for empty transcript - TAREA 7.2
+  const getPlaceholderTitle = () => {
+    switch (status) {
+      case 'idle': return 'Lista para transcribir';
+      case 'recording': return 'Grabando tu conversación...';
+      case 'processing': return 'Procesando audio...';
+      case 'completed': return 'Transcripción finalizada';
+      case 'error': return 'Error en la transcripción';
+      default: return 'Esperando...';
+    }
+  };
+
+  const getPlaceholderSubtitle = () => {
+    switch (status) {
+      case 'idle': return 'Presiona el botón de grabación para comenzar a transcribir tu reunión';
+      case 'recording': return 'Habla claramente cerca del micrófono. El texto aparecerá en tiempo real';
+      case 'processing': return 'Finalizando la transcripción. Esto puede tomar unos segundos';
+      case 'completed': return 'La transcripción se ha completado exitosamente';
+      case 'error': return 'Hubo un problema con la transcripción. Intenta nuevamente';
+      default: return 'El texto de la conversación aparecerá aquí...';
+    }
+  };
+
   if (!isSupported) {
     return (
       <div className={`${className}`}>
@@ -123,11 +162,29 @@ const TranscriptPanel: FC<TranscriptPanelProps> = ({ className = '' }) => {
           )}
         </div>
         
-        {wordCount > 0 && (
-          <div className="text-sm text-gray-400">
-            {wordCount.toLocaleString()} palabras
-          </div>
-        )}
+        {/* Live Word Counter - TAREA 7.4 */}
+        <div className="flex items-center space-x-4">
+          {wordCount > 0 && (
+            <div className="flex items-center space-x-2">
+              <div className="text-sm text-gray-400 font-mono">
+                {wordCount.toLocaleString()}
+              </div>
+              <div className="text-xs text-gray-500">
+                {wordCount === 1 ? 'palabra' : 'palabras'}
+              </div>
+              {status === 'recording' && (
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+              )}
+            </div>
+          )}
+          
+          {/* Words per minute indicator during recording */}
+          {status === 'recording' && duration > 0 && wordCount > 0 && (
+            <div className="text-xs text-purple-300 bg-purple-900/20 px-2 py-1 rounded">
+              {Math.round((wordCount / duration) * 60)} ppm
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Error Message */}
@@ -142,27 +199,55 @@ const TranscriptPanel: FC<TranscriptPanelProps> = ({ className = '' }) => {
         </div>
       )}
 
-      {/* Transcript Content */}
-      <div className="bg-gray-700 rounded-lg min-h-64 max-h-96 overflow-y-auto">
+      {/* Transcript Content - TAREA 7.3: Texto en tiempo real */}
+      <div className="bg-gray-700 rounded-lg min-h-64 max-h-96 overflow-y-auto relative">
         {transcript ? (
           <div className="p-4">
-            <div className="text-white text-sm leading-relaxed whitespace-pre-wrap">
+            <div className="text-white text-sm leading-relaxed whitespace-pre-wrap relative">
               {transcript}
+              {/* Real-time typing indicator */}
+              {status === 'recording' && (
+                <span className="inline-block w-2 h-4 bg-purple-400 ml-1 animate-pulse"></span>
+              )}
             </div>
             <div ref={transcriptEndRef} />
           </div>
         ) : (
           <div className="flex items-center justify-center h-64 text-gray-400">
-            <div className="text-center">
-              <svg className="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-              </svg>
-              <p className="text-sm">
-                {status === 'idle' 
-                  ? 'Presiona el botón de grabación para comenzar' 
-                  : 'El texto de la conversación aparecerá aquí...'
-                }
-              </p>
+            <div className="text-center space-y-4">
+              {/* Placeholder Icon - TAREA 7.2 */}
+              <div className="relative">
+                <svg className="w-16 h-16 mx-auto opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
+                {status === 'recording' && (
+                  <div className="absolute -top-1 -right-1">
+                    <div className="w-4 h-4 bg-red-500 rounded-full animate-pulse"></div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Dynamic Placeholder Text based on status */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium">
+                  {getPlaceholderTitle()}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {getPlaceholderSubtitle()}
+                </p>
+              </div>
+
+              {/* Recording indicators */}
+              {status === 'recording' && (
+                <div className="flex items-center justify-center space-x-2 text-red-400">
+                  <div className="flex space-x-1">
+                    <div className="w-1 h-4 bg-red-500 rounded animate-pulse" style={{animationDelay: '0ms'}}></div>
+                    <div className="w-1 h-4 bg-red-500 rounded animate-pulse" style={{animationDelay: '150ms'}}></div>
+                    <div className="w-1 h-4 bg-red-500 rounded animate-pulse" style={{animationDelay: '300ms'}}></div>
+                  </div>
+                  <span className="text-xs">Escuchando...</span>
+                </div>
+              )}
             </div>
           </div>
         )}
