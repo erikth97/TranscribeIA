@@ -12,11 +12,23 @@ interface MeetingState {
   sessionId: string;
   lastSaved: number;
   
-  // Actions
+  // Actions - Meeting Data
   setMeetingData: (data: MeetingData) => void;
-  updateMeetingData: (data: Partial<MeetingData>) => void;
+  updateMeeting: (data: Partial<MeetingData>) => void; // Alias según requerimiento
+  updateMeetingData: (data: Partial<MeetingData>) => void; // Mantener compatibilidad
+  
+  // Actions - Transcript Data
   setTranscriptData: (data: Partial<TranscriptData>) => void;
+  updateTranscript: (data: Partial<TranscriptData>) => void; // Según requerimiento
+  appendTranscriptText: (text: string) => void;
+  clearTranscript: () => void;
+  
+  // Actions - Summary Data
   setSummaryData: (data: Partial<SummaryData>) => void;
+  updateSummary: (data: Partial<SummaryData>) => void; // Según requerimiento
+  generateSummary: () => Promise<void>;
+  
+  // Session Actions
   startNewSession: () => void;
   saveSession: () => void;
   resetStore: () => void;
@@ -59,7 +71,7 @@ export const useMeetingStore = create<MeetingState>()(
       sessionId: generateSessionId(),
       lastSaved: Date.now(),
       
-      // Actions
+      // Meeting Data Actions
       setMeetingData: (data) => {
         set({ 
           meetingData: data,
@@ -74,6 +86,14 @@ export const useMeetingStore = create<MeetingState>()(
         }));
       },
       
+      updateMeeting: (data) => { // Alias según requerimiento Tarea 9
+        set((state) => ({
+          meetingData: { ...state.meetingData, ...data },
+          lastSaved: Date.now()
+        }));
+      },
+      
+      // Transcript Data Actions
       setTranscriptData: (data) => {
         set((state) => ({
           transcriptData: { ...state.transcriptData, ...data },
@@ -81,11 +101,103 @@ export const useMeetingStore = create<MeetingState>()(
         }));
       },
       
+      updateTranscript: (data) => { // Según requerimiento Tarea 9
+        set((state) => ({
+          transcriptData: { ...state.transcriptData, ...data },
+          lastSaved: Date.now()
+        }));
+      },
+      
+      appendTranscriptText: (text) => {
+        set((state) => ({
+          transcriptData: { 
+            ...state.transcriptData, 
+            text: state.transcriptData.text + (state.transcriptData.text ? ' ' : '') + text,
+            wordCount: (state.transcriptData.text + ' ' + text).trim().split(/\s+/).filter(word => word.length > 0).length
+          },
+          lastSaved: Date.now()
+        }));
+      },
+      
+      clearTranscript: () => {
+        set((state) => ({
+          transcriptData: { 
+            ...state.transcriptData, 
+            text: '',
+            wordCount: 0
+          },
+          lastSaved: Date.now()
+        }));
+      },
+      
+      // Summary Data Actions
       setSummaryData: (data) => {
         set((state) => ({
           summaryData: { ...state.summaryData, ...data },
           lastSaved: Date.now()
         }));
+      },
+      
+      updateSummary: (data) => { // Según requerimiento Tarea 9
+        set((state) => ({
+          summaryData: { ...state.summaryData, ...data },
+          lastSaved: Date.now()
+        }));
+      },
+      
+      generateSummary: async () => {
+        const { transcriptData, meetingData } = get();
+        
+        if (!transcriptData.text || transcriptData.text.trim().length < 50) {
+          set((state) => ({
+            summaryData: { 
+              ...state.summaryData, 
+              error: 'Necesitas al menos 50 caracteres de transcripción para generar un resumen'
+            }
+          }));
+          return;
+        }
+        
+        set((state) => ({
+          summaryData: { 
+            ...state.summaryData, 
+            isLoading: true, 
+            error: undefined 
+          }
+        }));
+        
+        try {
+          // ✅ TAREA 11: Usar generateSummary con parámetros exactos
+          const { generateSummary } = await import('../services/aiService');
+          const result = await generateSummary(transcriptData.text, meetingData);
+          
+          if (result.success) {
+            set((state) => ({
+              summaryData: {
+                content: result.summary,
+                isLoading: false,
+                error: undefined
+              },
+              lastSaved: Date.now()
+            }));
+          } else {
+            set((state) => ({
+              summaryData: {
+                content: '',
+                isLoading: false,
+                error: result.error || 'Error generando el resumen'
+              }
+            }));
+          }
+        } catch (error) {
+          set((state) => ({
+            summaryData: {
+              ...state.summaryData,
+              isLoading: false,
+              error: 'Error generando el resumen. Intenta nuevamente.'
+            }
+          }));
+        }
       },
       
       startNewSession: () => {
